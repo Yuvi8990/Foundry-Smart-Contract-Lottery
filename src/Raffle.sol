@@ -39,3 +39,6 @@ contract Raffle {
         return i_entranceFee;
     }
 }    
+
+// rule of thumb -- we always emit an event whenever we update something in storage.
+// events make -- migration easier(easy storage movement during redoplyment) and makes front end "indexing" easier
