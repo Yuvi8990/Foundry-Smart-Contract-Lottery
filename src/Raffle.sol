@@ -9,6 +9,7 @@ import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/V
 error Raffle__Didnot_send_enough_raffleFee();
 error Raffle__NotEnoughTimeHasPassedForDraw();
 error Raffle__TransferFailed();
+error Raffle__RaffleNotOpen();
 
 // having natSpec is a great way to annotate your smart contracts for devs and stuff and it also shows that you know what you are doing
 /**
@@ -19,6 +20,13 @@ error Raffle__TransferFailed();
  */
 
 contract Raffle is VRFConsumerBaseV2Plus {
+    /* Type Declarations */
+    enum RaffleState {
+        OPEN, //0
+        CALCULATING_WINNER //1
+    }
+
+    /* State Variables */
     uint16 private constant REQUEST_CONFIRMATIONS = 3;
     uint32 private constant NUM_WORDS = 1;
     uint256 private immutable i_entranceFee;
@@ -29,6 +37,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
     address payable[] private s_players; //since one of the addresses stored inside here wins, and will needs to be paid the prize so payable
     uint256 private s_lastTimeStamp;
     address private s_recentWinner;
+    RaffleState private s_raffleState;
 
     /* Events */
     event RaffleEntered(address indexed player);
@@ -47,11 +56,15 @@ contract Raffle is VRFConsumerBaseV2Plus {
         i_subscriptionId = subscriptionId;
         i_callbackGasLimit = callbackGasLimit;
         s_lastTimeStamp = block.timestamp;
+        s_raffleState = RaffleState.OPEN;
     }
 
     function enterRaffle() external payable {
         if (msg.value < i_entranceFee) {
             revert Raffle__Didnot_send_enough_raffleFee();
+        }
+        if (s_raffleState != RaffleState.OPEN) {
+            revert Raffle__RaffleNotOpen();
         }
         s_players.push(payable(msg.sender));
         emit RaffleEntered(msg.sender);
@@ -65,8 +78,9 @@ contract Raffle is VRFConsumerBaseV2Plus {
         if (block.timestamp - s_lastTimeStamp < i_interval) {
             revert Raffle__NotEnoughTimeHasPassedForDraw();
         }
-        // Get our random number from blockchain
+        s_raffleState = RaffleState.CALCULATING_WINNER;
 
+        // Get our random number from blockchain
         VRFV2PlusClient.RandomWordsRequest memory request = VRFV2PlusClient.RandomWordsRequest({
             keyHash: i_keyHash,
             subId: i_subscriptionId,
@@ -83,6 +97,8 @@ contract Raffle is VRFConsumerBaseV2Plus {
         uint256 indexOfWinner = randomWords[0] % s_players.length;
         address payable recentWinner = s_players[indexOfWinner];
         s_recentWinner = recentWinner;
+        s_raffleState = RaffleState.OPEN;
+
         (bool success,) = recentWinner.call{value: address(this).balance}("");
         if (!success) {
             revert Raffle__TransferFailed();
