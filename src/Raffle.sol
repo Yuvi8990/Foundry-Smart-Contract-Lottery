@@ -115,4 +115,4 @@ contract Raffle is VRFConsumerBaseV2Plus {
 
 // rule of thumb -- we always emit an event whenever we update something in storage.
 // events make -- migration easier(easy storage movement during redoplyment) and makes front end "indexing" easier
-// block.timestamp is the active time after deployment of contract on blockchain and this global variable gives it
+
