@@ -8,6 +8,7 @@ import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/V
 /* Errors */
 error Raffle__Didnot_send_enough_raffleFee();
 error Raffle__NotEnoughTimeHasPassedForDraw();
+error Raffle__TransferFailed();
 
 // having natSpec is a great way to annotate your smart contracts for devs and stuff and it also shows that you know what you are doing
 /**
@@ -27,6 +28,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
     uint32 private immutable i_callbackGasLimit;
     address payable[] private s_players; //since one of the addresses stored inside here wins, and will needs to be paid the prize so payable
     uint256 private s_lastTimeStamp;
+    address private s_recentWinner;
 
     /* Events */
     event RaffleEntered(address indexed player);
@@ -77,7 +79,15 @@ contract Raffle is VRFConsumerBaseV2Plus {
         uint256 requestId = s_vrfCoordinator.requestRandomWords(request);
     }
 
-    function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {}
+    function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {
+        uint256 indexOfWinner = randomWords[0] % s_players.length;
+        address payable recentWinner = s_players[indexOfWinner];
+        s_recentWinner = recentWinner;
+        (bool success,) = recentWinner.call{value: address(this).balance}("");
+        if (!success) {
+            revert Raffle__TransferFailed();
+        }
+    }
 
     /**
      * Getter Functions
