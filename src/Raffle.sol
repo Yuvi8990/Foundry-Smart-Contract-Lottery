@@ -105,7 +105,11 @@ contract Raffle is VRFConsumerBaseV2Plus {
         return (upkeepNeeded, "");
     }
 
-    function performUpkeep() external {
+    function performUpkeep(
+        bytes calldata /*performData*/
+    )
+        external
+    {
         //first we check if enough time has passed before picking a winner.
         (bool upkeepNeeded,) = checkUpkeep("");
         if (!upkeepNeeded) {
