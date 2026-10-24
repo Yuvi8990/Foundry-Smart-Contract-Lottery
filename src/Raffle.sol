@@ -5,12 +5,6 @@ pragma solidity 0.8.19;
 import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 
-/* Errors */
-error Raffle__Didnot_send_enough_raffleFee();
-error Raffle__UpkeepNotNeeded(uint256 balance, uint256 playersLength, uint256 raffleState);
-error Raffle__TransferFailed();
-error Raffle__RaffleNotOpen();
-
 // having natSpec is a great way to annotate your smart contracts for devs and stuff and it also shows that you know what you are doing
 /**
  * @title Raffle contract
@@ -20,6 +14,13 @@ error Raffle__RaffleNotOpen();
  */
 
 contract Raffle is VRFConsumerBaseV2Plus {
+
+    /* Errors */
+    error Raffle__Didnot_send_enough_raffleFee();
+    error Raffle__UpkeepNotNeeded(uint256 balance, uint256 playersLength, uint256 raffleState);
+    error Raffle__TransferFailed();
+    error Raffle__RaffleNotOpen();
+
     /* Type Declarations */
     enum RaffleState {
         OPEN, //0
@@ -151,6 +152,14 @@ contract Raffle is VRFConsumerBaseV2Plus {
      */
     function getEntranceFee() public view returns (uint256) {
         return i_entranceFee;
+    }
+
+    function getRaffleState() public view returns (RaffleState) {
+        return s_raffleState;
+    }
+
+    function getPlayers(uint256 indexOfPlayer) external view returns(address) {
+        return s_players[indexOfPlayer];
     }
 }
 
