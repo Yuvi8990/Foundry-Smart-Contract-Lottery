@@ -26,6 +26,6 @@ contract DeployRaffle is Script {
         );
         vm.stopBroadcast();
         return (raffle, helperConfig);
-    }    
+    }
 }
 
