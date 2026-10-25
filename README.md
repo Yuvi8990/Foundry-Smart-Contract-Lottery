@@ -29,7 +29,7 @@ An automated smart contract lottery built with Foundry. Players buy entries with
    - [7.4 Chainlink Automation](#-74-chainlink-automation)
    - [7.5 Picking a winner with modulo](#-75-picking-a-winner-with-modulo)
    - [7.6 Deployment scripts](#-76-deployment-scripts)
-8. [License and acknowledgements](#-8-license-and-acknowledgements)
+8. [License](#-8-license)
 
 ---
 
