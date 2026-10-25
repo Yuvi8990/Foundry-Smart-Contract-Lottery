@@ -9,7 +9,292 @@
 An automated smart contract lottery built with Foundry. Players buy entries with ETH, Chainlink Automation decides when a round ends, Chainlink VRF supplies a verifiable random number, and the winner is paid out automatically.
 
 - **Developer and write-ups:** Yuvraj Singh
+- **Course:** Built alongside Patrick Collins' Cyfrin Updraft *Foundry Fundamentals* course (Smart Contract Lottery section, `foundry-smart-contract-lottery-cu`). The contract follows the # 🎟️ Foundry Smart Contract Lottery (`Raffle.sol`)
+
+[![Solidity](https://img.shields.io/badge/Solidity-0.8.19-363636?style=for-the-badge&logo=solidity)](https://soliditylang.org/)
+[![Foundry](https://img.shields.io/badge/Foundry-Forge%20%7C%20Anvil%20%7C%20Cast-FFDB1C?style=for-the-badge)](https://getfoundry.sh/)
+[![Chainlink VRF](https://img.shields.io/badge/Chainlink-VRF%20v2.5-375BD2?style=for-the-badge&logo=chainlink)](https://docs.chain.link/vrf)
+[![Chainlink Automation](https://img.shields.io/badge/Chainlink-Automation-375BD2?style=for-the-badge&logo=chainlink)](https://docs.chain.link/chainlink-automation)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+
+An automated smart contract lottery built with Foundry. Players buy entries with ETH, Chainlink Automation decides when a round ends, Chainlink VRF supplies a verifiable random number, and the winner is paid out automatically.
+
+- **Developer and write-ups:** Yuvraj Singh
 - **Course:** Built alongside Patrick Collins' Cyfrin Updraft *Foundry Fundamentals* course (Smart Contract Lottery section, `foundry-smart-contract-lottery-cu`). The contract follows the course design. The explanations, diagrams, test breakdowns and the Known Limitations section are my own notes, written while studying it.
+- **Stack:** Solidity `^0.8.19` | Foundry (`forge`, `anvil`, `cast`) | Chainlink VRF v2.5 (`VRFConsumerBaseV2Plus`) | Chainlink Automation (`AutomationCompatibleInterface`)
+
+---
+
+## 📑 Contents
+
+1. [Overview](#-1-overview)
+2. [Architecture](#-2-architecture)
+3. [Quickstart](#-3-quickstart)
+4. [Tests](#-4-tests)
+5. [Gas and security choices](#-5-gas-and-security-choices)
+6. [Known limitations](#-6-known-limitations)
+7. [Study notes](#-7-study-notes)
+   - [7.1 Why a blockchain needs oracles](#-71-why-a-blockchain-needs-oracles)
+   - [7.2 Walkthrough of `Raffle.sol`](#-72-walkthrough-of-rafflesol)
+   - [7.3 Chainlink VRF v2.5](#-73-chainlink-vrf-v25)
+   - [7.4 Chainlink Automation](#-74-chainlink-automation)
+   - [7.5 Picking a winner with modulo](#-75-picking-a-winner-with-modulo)
+   - [7.6 Deployment scripts](#-76-deployment-scripts)
+8. [License](#8-license)
+
+---
+
+## 🎯 1. Overview
+
+`Raffle.sol` runs lottery rounds with no human in the loop after deployment.
+
+* **Enter:** Anyone can call `enterRaffle()` and send at least `i_entranceFee` in ETH.
+* **Timer check:** Chainlink Automation nodes call `checkUpkeep()` to see whether the interval (`i_interval`) has passed, the raffle is open, and there is at least one player and a balance.
+* **Lock and request randomness:** When the conditions are met, Automation calls `performUpkeep()`. It sets the state to `CALCULATING`, which blocks new entries, and requests a random number from Chainlink VRF v2.5.
+* **Pick, pay, reset:** The VRF coordinator verifies the random number's proof on-chain and calls back into `fulfillRandomWords()`. The contract uses modulo arithmetic (`randomWords[0] % s_players.length`) to choose the winner index, sends the contract's entire ETH balance to the winner, resets `s_players`, opens the raffle again (`OPEN`), and updates `s_lastTimeStamp`.
+
+---
+
+## 🏗️ 2. Architecture
+
+```
+ Player                Chainlink Automation               Chainlink VRF Coordinator
+   │                            │                                    │
+   │ 1. enterRaffle()           │                                    │
+   │ ──(send ETH >= fee)──────> │                                    │
+   │                            │                                    │
+   │                            │ 2. checkUpkeep() [off-chain view]  │
+   │                            │ ─────────────────────────────────> │ (Raffle contract)
+   │                            │                                    │
+   │                            │ 3. performUpkeep()                 │
+   │                            │ ──(state -> CALCULATING)─────────> │
+   │                            │ ──(requestRandomWords)───────────> │
+   │                            │                                    │ 4. fulfillRandomWords()
+   │                            │                                    │ ──(pick winner via modulo)
+   │                            │                                    │ ──(send ETH balance)
+   │                            │                                    │ ──(reset players array)
+   │                            │                                    │ ──(state -> OPEN)
+```
+
+### Key state transitions
+
+| Current State | Trigger | Next State | Allowed actions |
+| :--- | :--- | :--- | :--- |
+| `OPEN` | Player calls `enterRaffle()` with `>= entranceFee` | `OPEN` | `s_players.push(player)` <br> Event: emit `RaffleEntered(msg.sender)` |
+| `OPEN` | Player calls `enterRaffle()` with `< entranceFee` | `OPEN` | Reverts with `Raffle__Didnot_send_enough_raffleFee()` |
+| `OPEN` | `checkUpkeep()` returns `true` | Node calls `performUpkeep()` | State becomes `CALCULATING` <br> Event: emit `RequestedRaffleWinner(requestId)` |
+| `CALCULATING` | Player calls `enterRaffle()` | `CALCULATING` | Reverts with `Raffle__RaffleNotOpen()` |
+| `CALCULATING` | VRF coordinator calls `fulfillRandomWords()` | `OPEN` | Winner receives prize <br> `s_players` reset <br> `s_lastTimeStamp` updated <br> Event: emit `WinnerPicked(winner)` |
+
+---
+
+## ⚡ 3. Quickstart
+
+### Prerequisites
+
+* [Git](https://git-scm.com/)
+* [Foundry](https://getfoundry.sh/) (`forge`, `anvil`, `cast`)
+
+### Install and build
+
+Clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/Yuvi8990/Foundry-Smart-Contract-Lottery.git
+cd Foundry-Smart-Contract-Lottery
+forge install
+forge build
+```
+
+### Run the tests
+
+Run all unit tests:
+
+```bash
+forge test
+```
+
+Run a specific test with verbose logging:
+
+```bash
+forge test --mt testFullfillrandomWordsPicksAWinnerResetsAndSendsMoney -vvvv
+```
+
+Check test coverage:
+
+```bash
+forge coverage
+```
+
+### Deploy locally (Anvil)
+
+Start a local Anvil node in one terminal:
+
+```bash
+anvil
+```
+
+In a second terminal, deploy using the Foundry script:
+
+```bash
+forge script script/DeployRaffle.s.sol:DeployRaffle --rpc-url http://127.0.0.1:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast
+```
+
+### Deploy to Sepolia testnet
+
+Set your environment variables (or put them in a `.env` file):
+
+```bash
+export SEPOLIA_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"
+export PRIVATE_KEY="0xYOUR_PRIVATE_KEY"
+export ETHERSCAN_API_KEY="YOUR_ETHERSCAN_KEY"
+```
+
+Deploy and verify on Etherscan:
+
+```bash
+forge script script/DeployRaffle.s.sol:DeployRaffle --rpc-url $SEPOLIA_RPC_URL --private-key $PRIVATE_KEY --broadcast --verify --etherscan-api-key $ETHERSCAN_API_KEY
+```
+
+---
+
+## 🧪 4. Tests
+
+All 12 tests live in `test/unit/RaffleTest.t.sol`.
+
+### Unit test suite summary
+
+| Test function | What it verifies |
+| :--- | :--- |
+| `testRaffleInitializesInOpenState` | `s_raffleState` is set to `RaffleState.OPEN` on deployment. |
+| `testRaffleRevertsWhenYouDontPayEnough` | Calling `enterRaffle()` with less than `i_entranceFee` reverts with `Raffle__Didnot_send_enough_raffleFee()`. |
+| `testRaffleRecordsPlayersWhenTheyEnter` | Successful entry pushes player address into `s_players`. |
+| `testEnteringRaffleEmitsevent` | Emits `RaffleEntered(player)` upon successful entry. |
+| `testDontAllowPlayersToEnterWhileRaffleIsCalculating` | Reverts with `Raffle__RaffleNotOpen()` when `s_raffleState` is `CALCULATING`. |
+| `testCheckUpkeepReturnsFalseIfItHasNoBalance` | `checkUpkeep()` returns `false` when time has passed but no ETH has been deposited. |
+| `testCheckUpkeepReturnsFalseIfRaffleIsntOpen` | `checkUpkeep()` returns `false` when the raffle state is `CALCULATING`. |
+| `testPerformUpkeepCanOnlyRunIfCheckUpkeepIsTrue` | `performUpkeep()` succeeds when all four upkeep conditions are met. |
+| `testPerformUpkeepRevertsIfCheckUpkeepIsFalse` | `performUpkeep()` reverts with `Raffle__UpkeepNotNeeded(...)` when upkeep conditions are not met. |
+| `testPerformUpkeepUpdatesRaffleStateAndEmitsRequestId` | `performUpkeep()` sets state to `CALCULATING` and emits `RequestedRaffleWinner(requestId)`. |
+| `testFullfillrandomWordsCanOnlyBeCalledAfterPerformUpkeep` | Fuzz test: `fulfillRandomWords()` reverts if called with a `requestId` that was never requested. |
+| `testFullfillrandomWordsPicksAWinnerResetsAndSendsMoney` | End-to-end flow: picks winner, pays prize, resets array, updates timestamp, opens raffle. |
+
+### Gas report summary (`Raffle.sol`)
+
+Generated with `forge test --gas-report`:
+
+| Function name | Min | Avg | Median | Max | # Calls |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `enterRaffle` | 24,785 | 44,785 | 44,785 | 64,785 | 8 |
+| `performUpkeep` | 13,322 | 41,208 | 41,208 | 69,095 | 3 |
+| `fulfillRandomWords` | 42,105 | 42,105 | 42,105 | 42,105 | 1 |
+
+---
+
+## 🔒 5. Gas and security choices
+
+| Choice | Implementation in `Raffle.sol` | Why it matters |
+| :--- | :--- | :--- |
+| **Custom errors** | `error Raffle__Didnot_send_enough_raffleFee()`, `error Raffle__RaffleNotOpen()`, `error Raffle__UpkeepNotNeeded(...)`, `error Raffle__TransferFailed()` | Custom errors save gas compared to `require(condition, "string")` because string error messages store long strings in contract bytecode. |
+| **CEI pattern** | Checks $\rightarrow$ Effects $\rightarrow$ Interactions in `fulfillRandomWords()` | Reentrancy guard through ordering: state (`s_raffleState = OPEN`), array (`s_players = new address[](0)`), and timestamp (`s_lastTimeStamp = block.timestamp`) are reset **before** the call `payable(winner).call{value: address(this).balance}("")`. |
+| **Immutable / constant variables** | `i_entranceFee`, `i_interval`, `i_keyHash`, `i_subscriptionId`, `i_callbackGasLimit` | Immutable state variables are stored in contract bytecode rather than storage slots, saving ~2,100 gas per read. |
+| **Indexed event fields** | `event RaffleEntered(address indexed player)`, `event WinnerPicked(address indexed winner)` | Indexed fields allow off-chain applications (dApps, indexers) to filter logs efficiently without parsing full event payloads. |
+| **Explicit getter functions** | `getEntranceFee()`, `getRaffleState()`, `getPlayers()`, `getLastTimeStamp()`, `getRecentWinner()` | Encapsulates storage layout and provides a stable external interface. |
+
+---
+
+## ⚠️ 6. Known limitations
+
+1. **Single winner per round:** The contract picks 1 winner per interval. If no one enters during an interval, Automation skips execution until at least 1 player enters.
+2. **Subscription funding required:** Chainlink VRF v2.5 calls require LINK in the subscription balance on testnet/mainnet. On local Anvil, `VRFCoordinatorV2_5Mock` simulates this off-chain for free.
+3. **Block time dependency:** `block.timestamp` is used for interval checks (`block.timestamp - s_lastTimeStamp >= i_interval`). Miners/validators have minor control over timestamp drift (~15 seconds), which is acceptable for lotteries operating over longer intervals (e.g. minutes/hours).
+
+---
+
+## 📚 7. Study notes
+
+### 7.1 Why a blockchain needs oracles
+
+Smart contracts run deterministically inside the Ethereum Virtual Machine (EVM). Every node re-executes every transaction to reach consensus. Because of this, contracts **cannot** perform non-deterministic operations like fetching HTTP APIs or generating true random numbers internally.
+
+Chainlink solves both issues for this raffle:
+1. **Chainlink VRF v2.5** supplies cryptographically verifiable random numbers.
+2. **Chainlink Automation** acts as an off-chain cron job that triggers `performUpkeep()` when `checkUpkeep()` returns `true`.
+
+### 7.2 Walkthrough of `Raffle.sol`
+
+#### `enterRaffle()`
+
+* **Custom error check:** If `msg.value < i_entranceFee`, the function reverts with `Raffle__Didnot_send_enough_raffleFee()`.
+* **State check:** If `s_raffleState != RaffleState.OPEN`, it reverts with `Raffle__RaffleNotOpen()`.
+* **Player recording:** `s_players.push(payable(msg.sender))` records the participant.
+* **Event:** `emit RaffleEntered(msg.sender)` notifies off-chain listeners.
+
+#### 📢 Why `RaffleEntered(address indexed player)` is emitted after the storage update
+
+Emitting events after state updates adheres to the Checks-Effects-Interactions (CEI) pattern. Off-chain indexers reading the event are guaranteed that `s_players` contains the new player when the log is produced.
+
+### 7.3 Chainlink VRF v2.5
+
+VRF (Verifiable Random Function) v2.5 uses a two-step process to guarantee randomness cannot be manipulated by miners, validators, or players:
+
+1. **Request:** `Raffle.sol` calls `s_vrfCoordinator.requestRandomWords(...)` inside `performUpkeep()`. This emits a request log on-chain with parameters like `keyHash`, `subId`, and `callbackGasLimit`.
+2. **Fulfill:** Off-chain VRF nodes generate the random number along with a cryptographic proof. The VRF coordinator contract verifies the proof on-chain and calls back `Raffle.sol`'s `fulfillRandomWords(requestId, randomWords)`.
+
+### 7.4 Chainlink Automation
+
+Chainlink Automation uses two functions:
+
+```solidity
+function checkUpkeep(bytes memory /* performData */)
+    public
+    view
+    returns (bool upkeepNeeded, bytes memory /* performData */)
+{
+    bool timePassed = (block.timestamp - s_lastTimeStamp) >= i_interval;
+    bool isOpen = s_raffleState == RaffleState.OPEN;
+    bool hasBalance = address(this).balance > 0;
+    bool hasPlayers = s_players.length > 0;
+    upkeepNeeded = (timePassed && isOpen && hasBalance && hasPlayers);
+    return (upkeepNeeded, "");
+}
+```
+
+`upkeepNeeded` is `true` only if all four are true. The second return value is a placeholder. `""` is an empty bytes payload returned to the Automation node.
+
+### 7.5 Picking a winner with modulo
+
+Inside `fulfillRandomWords()`:
+
+```solidity
+uint256 indexOfWinner = randomWords[0] % s_players.length;
+address payable recentWinner = s_players[indexOfWinner];
+s_recentWinner = recentWinner;
+s_raffleState = RaffleState.OPEN;
+s_players = new address payable[](0);
+s_lastTimeStamp = block.timestamp;
+emit WinnerPicked(recentWinner);
+
+(bool success, ) = recentWinner.call{value: address(this).balance}("");
+if (!success) {
+    revert Raffle__TransferFailed();
+}
+```
+
+The modulo operator `%` maps any `uint256` random number to a valid index in `[0, s_players.length - 1]`.
+
+### 7.6 Deployment scripts
+
+The `script/` folder contains three Foundry scripts:
+* `DeployRaffle.s.sol`: Deploys `Raffle.sol`, creates/funds a VRF subscription on mocks if on local Anvil, and adds `Raffle` as a consumer.
+* `HelperConfig.s.sol`: Provides network-specific parameters (VRF coordinator address, key hash, subscription ID, entrance fee, interval) for Sepolia vs. local Anvil.
+* `Interactions.s.sol`: Programmatically creates subscriptions, funds them with LINK, and adds consumers via `cast` / Foundry scripts.
+
+---
+
+## 📜 8. License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.course design. The explanations, diagrams, test breakdowns and the Known Limitations section are my own notes, written while studying it.
 - **Stack:** Solidity `0.8.19` | Foundry (`forge`, `anvil`, `cast`) | Chainlink VRF v2.5 (`VRFConsumerBaseV2Plus`) | Chainlink Automation (`AutomationCompatibleInterface`)
 
 ---
