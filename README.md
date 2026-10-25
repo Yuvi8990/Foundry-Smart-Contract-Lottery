@@ -8,9 +8,9 @@
 
 An automated smart contract lottery built with Foundry. Players buy entries with ETH, Chainlink Automation decides when a round ends, Chainlink VRF supplies a verifiable random number, and the winner is paid out automatically.
 
-**Developer and write-ups:** Yuvraj Singh
-**Course:** Built alongside Patrick Collins' Cyfrin Updraft *Foundry Fundamentals* course (Smart Contract Lottery section, `foundry-smart-contract-lottery-cu`). The contract follows the course design. The explanations, diagrams, test breakdowns and the Known Limitations section are my own notes, written while studying it.
-**Stack:** Solidity `0.8.19` | Foundry (`forge`, `anvil`, `cast`) | Chainlink VRF v2.5 (`VRFConsumerBaseV2Plus`) | Chainlink Automation (`AutomationCompatibleInterface`)
+- **Developer and write-ups:** Yuvraj Singh
+- **Course:** Built alongside Patrick Collins' Cyfrin Updraft *Foundry Fundamentals* course (Smart Contract Lottery section, `foundry-smart-contract-lottery-cu`). The contract follows the course design. The explanations, diagrams, test breakdowns and the Known Limitations section are my own notes, written while studying it.
+- **Stack:** Solidity `0.8.19` | Foundry (`forge`, `anvil`, `cast`) | Chainlink VRF v2.5 (`VRFConsumerBaseV2Plus`) | Chainlink Automation (`AutomationCompatibleInterface`)
 
 ---
 
@@ -406,7 +406,6 @@ If `config.subscriptionId == 0`, `DeployRaffle` uses three script contracts to s
 
 ---
 
-## 📜 8. License and acknowledgements
+## 📜 8. License
 
-* **License:** MIT
-* **Acknowledgements:** Built by Yuvraj Singh with guidance from Patrick Collins and the Cyfrin Updraft *Foundry Fundamentals* course (`foundry-smart-contract-lottery-cu`). The explanations, diagrams and limitations notes in this README are from my own study notes, written while building the project.
+Distributed under the **MIT License**.
