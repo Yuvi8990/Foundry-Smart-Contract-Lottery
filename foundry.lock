@@ -11,6 +11,12 @@
       "rev": "f3dae6e6ee381f25eb6a246f7da9b85c91a68219"
     }
   },
+  "lib/foundry-devops": {
+    "tag": {
+      "name": "0.4.0",
+      "rev": "efff097a87e70c3d15661c9f2a2daeae0b33d5d5"
+    }
+  },
   "lib/solmate": {
     "tag": {
       "name": "v6",

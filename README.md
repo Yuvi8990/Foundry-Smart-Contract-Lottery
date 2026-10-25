@@ -138,7 +138,10 @@ Foundry-Smart-Contract-Lottery/
 ├── test/
 │   ├── unit/RaffleTest.t.sol      # Unit, fuzz, event-log and full lifecycle tests
 │   └── mocks/LinkToken.sol        # Local LINK token mock for Anvil funding
+<<<<<<< HEAD
 ├── Makefile                       # Shortcuts for build, test, anvil and Sepolia deploy
+=======
+>>>>>>> 43eac24 (Finalize the tests)
 └── foundry.toml                   # Foundry configuration and remappings
 ```
 
@@ -147,7 +150,11 @@ Foundry-Smart-Contract-Lottery/
 ```bash
 git clone https://github.com/Yuvi8990/Foundry-Smart-Contract-Lottery.git
 cd Foundry-Smart-Contract-Lottery
+<<<<<<< HEAD
 make install
+=======
+forge install
+>>>>>>> 43eac24 (Finalize the tests)
 forge build
 ```
 
@@ -172,6 +179,7 @@ forge coverage
 
 ```bash
 # Terminal 1: start a local Anvil node
+<<<<<<< HEAD
 make anvil
 
 # Terminal 2: deploy locally (deploys mocks, creates and funds a subscription, adds the consumer)
@@ -179,6 +187,16 @@ make deploy
 
 # Deploy to Sepolia (needs SEPOLIA_RPC_URL and PRIVATE_KEY in .env)
 make deploy ARGS="--network sepolia"
+=======
+anvil
+
+# Terminal 2: deploy locally (deploys mocks, creates and funds a subscription, adds the consumer)
+forge script script/DeployRaffle.s.sol --rpc-url http://localhost:8545 --broadcast
+
+# Deploy to Sepolia (needs SEPOLIA_RPC_URL and PRIVATE_KEY in .env)
+source .env
+forge script script/DeployRaffle.s.sol --rpc-url $SEPOLIA_RPC_URL --private-key $PRIVATE_KEY --broadcast --verify --etherscan-api-key $ETHERSCAN_API_KEY
+>>>>>>> 43eac24 (Finalize the tests)
 ```
 
 ### 🎟️ Enter the raffle on Sepolia
@@ -191,6 +209,7 @@ cast send <RAFFLE_CONTRACT_ADDRESS> "enterRaffle()" --value 0.01ether --private-
 
 ## 🧪 4. Tests
 
+<<<<<<< HEAD
 All 11 tests live in `test/unit/RaffleTest.t.sol`.
 
 | Test | Cheatcodes used | What it verifies | Gas |
@@ -227,6 +246,56 @@ testDontAllowPlayersToEnterWhileRaffleIsCalculating         161,916  ███�
 testFulfillRandomWordsPicksAWinnerResetsAndSendsMoney       310,543  ████████████████████████████████████████
 ```
 
+=======
+All 12 tests live in `test/unit/RaffleTest.t.sol`. Suite result: **12 passed, 0 failed, 0 skipped** (32.16 ms).
+
+| Test | Cheatcodes used | What it verifies | Gas |
+| :--- | :--- | :--- | ---: |
+| `testRaffleInitializesInOpenState` | None (`view`) | `raffle.getRaffleState() == Raffle.RaffleState.OPEN` right after deployment. | `8,113` |
+| `testRaffleRevertsWhenYouDontPayEnough` | `vm.prank`, `vm.expectRevert` | `enterRaffle()` with `0` ETH reverts with `Raffle__Didnot_send_enough_raffleFee`. | `32,150` |
+| `testRaffleRecordsPlayersWhenTheyEnter` | `vm.prank` | After `PLAYER` enters with the entrance fee, `raffle.getPlayers(0) == PLAYER`. | `94,457` |
+| `testEnteringRaffleEmitsEvent` | `vm.prank`, `vm.expectEmit` | `RaffleEntered(PLAYER)` is emitted when `PLAYER` enters. | `90,677` |
+| `testDontAllowPlayersToEnterWhileRaffleIsCalculating` | `vm.prank`, `vm.warp`, `vm.roll`, `vm.expectRevert` | After `performUpkeep("")`, new entries revert with `Raffle__RaffleNotOpen`. | `300,556` |
+| `testCheckUpkeepReturnsFalseIfItHasNoBalance` | `vm.warp`, `vm.roll` | After the interval passes with no balance and no players, `checkUpkeep("")` returns `false`. | `20,951` |
+| `testCheckUpkeepReturnsFalseIfRaffleIsntOpen` | `vm.prank`, `vm.warp`, `vm.roll` | After a player enters and `performUpkeep("")` sets state to `CALCULATING`, `checkUpkeep("")` returns `false`. | `278,541` |
+| `testPerformUpKeepCanOnlyRunIfCheckUpkeepIsTrue` | `vm.prank`, `vm.warp`, `vm.roll` | With a player entered and time and block number advanced, `performUpkeep("")` succeeds without reverting. | `268,494` |
+| `testPerformUpkeepRevertsIfCheckUpkeepIsFalse` | `vm.prank`, `vm.expectRevert` | Calling `performUpkeep("")` too early reverts with `Raffle__UpkeepNotNeeded(balance, numPlayers, rState)`. | `128,236` |
+| `testPerformUpkeepUpdatesRaffleStateAndEmitsRequestId` | `vm.recordLogs`, `vm.getRecordedLogs` | Records logs during `performUpkeep("")`, reads `requestId` from `entries[1].topics[1]`, and checks the state is `CALCULATING`. | `279,633` |
+| `testFullfillrandomWordsCanOnlyBeCalledAfterPerformUpkeep` | Fuzz (`uint256 randomRequestId`) | 256 fuzz runs (μ: 125,129) pass random fake request IDs to `VRFCoordinatorV2_5Mock` and confirm it reverts with `InvalidRequest`. | `~125,129` |
+| `testFullfillrandomWordsPicksAWinnerResetsAndSendsMoney` | `hoax`, `vm.recordLogs` | End to end: 4 players enter, `performUpkeep("")` runs, the mock fulfills the request, the winner receives the full pot, and the raffle resets to `OPEN`. | `621,277` |
+
+### 📊 Gas used per test
+
+```text
+Test                                                              Gas Used   Bar
+----------------------------------------------------------------  ---------  ----------------------------------------
+testRaffleInitializesInOpenState                                      8,113  █
+testCheckUpkeepReturnsFalseIfItHasNoBalance                          20,951  █
+testRaffleRevertsWhenYouDontPayEnough                                32,150  ██
+testEnteringRaffleEmitsEvent                                         90,677  ██████
+testRaffleRecordsPlayersWhenTheyEnter                                94,457  ██████
+testFullfillrandomWordsCanOnlyBeCalledAfterPerformUpkeep            125,129  ████████
+testPerformUpkeepRevertsIfCheckUpkeepIsFalse                        128,236  ████████
+testPerformUpKeepCanOnlyRunIfCheckUpkeepIsTrue                      268,494  █████████████████
+testCheckUpkeepReturnsFalseIfRaffleIsntOpen                         278,541  ██████████████████
+testPerformUpkeepUpdatesRaffleStateAndEmitsRequestId                279,633  ██████████████████
+testDontAllowPlayersToEnterWhileRaffleIsCalculating                 300,556  ███████████████████
+testFullfillrandomWordsPicksAWinnerResetsAndSendsMoney              621,277  ████████████████████████████████████████
+```
+
+### 📦 Raffle.sol function gas report (`forge test --gas-report`)
+
+| Function | Min | Avg | Median | Max | # Calls |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| `checkUpkeep` | `8,359` | `8,361` | `8,361` | `8,364` | `2` |
+| `enterRaffle` | `21,267` | `68,495` | `69,031` | `69,031` | `270` |
+| `getLastTimeStamp` | `2,503` | `2,503` | `2,503` | `2,503` | `2` |
+| `getPlayers` | `5,034` | `5,034` | `5,034` | `5,034` | `1` |
+| `getRaffleState` | `2,664` | `2,664` | `2,664` | `2,664` | `4` |
+| `getRecentWinner` | `2,611` | `2,611` | `2,611` | `2,611` | `1` |
+| `performUpkeep` | `29,501` | `151,488` | `175,886` | `175,886` | `6` |
+
+>>>>>>> 43eac24 (Finalize the tests)
 ### 🛠️ Cheatcodes used
 
 * **`vm.warp(block.timestamp + interval + 1)` and `vm.roll(block.number + 1)`:** Move time and the block number forward on the local chain so `timePassed` in `checkUpkeep` becomes `true`.
@@ -290,7 +359,11 @@ These sections explain the reasoning behind the contract. They are my notes from
 #### 🎟️ `enterRaffle()`: entrance fee, overpayment and the `s_players` array
 
 * **Immutable entrance fee (`i_entranceFee`):** It is set once in the constructor, so the fee can be chosen at deployment, and reading it is cheap afterwards.
+<<<<<<< HEAD
 * **Custom error check:** If `msg.value < i_entranceFee`, the function reverts with `Raffle__SendMoreToEnterRaffle()`, which is cheaper than a `require` with a text string. `require` with custom errors arrived in Solidity `0.8.26` (via-IR) and `0.8.27` (default pipeline), while `if` plus `revert` works across `0.8.19` and later.
+=======
+* **Custom error check:** If `msg.value < i_entranceFee`, the function reverts with `Raffle__Didnot_send_enough_raffleFee()`, which is cheaper than a `require` with a text string. `require` with custom errors arrived in Solidity `0.8.26` (via-IR) and `0.8.27` (default pipeline), while `if` plus `revert` works across `0.8.19` and later.
+>>>>>>> 43eac24 (Finalize the tests)
 * **Paying more than the fee:** The check only rejects too little. A caller who sends extra still gets one entry in `s_players`, and the extra ETH stays in the contract and adds to the prize pool.
 * **Payable player array (`address payable[] private s_players`):** Players are stored as `payable` addresses so the winner can be paid directly.
 
@@ -351,10 +424,17 @@ Automation nodes look for two functions from `AutomationCompatibleInterface`.
 
 ```solidity
 upkeepNeeded = (timePassed && isOpen && hasBalance && hasPlayers);
+<<<<<<< HEAD
 return (upkeepNeeded, "0x0");
 ```
 
   `upkeepNeeded` is `true` only if all four are true. The second return value is a placeholder. `"0x0"` is the three ASCII characters `0`, `x`, `0` converted to bytes, not an empty value, and Automation ignores it here.
+=======
+return (upkeepNeeded, "");
+```
+
+  `upkeepNeeded` is `true` only if all four are true. The second return value is an empty `bytes` placeholder that Automation ignores here.
+>>>>>>> 43eac24 (Finalize the tests)
 
 #### ⚡ `performUpkeep(bytes calldata /* performData */)`
 
