@@ -59,7 +59,7 @@ flowchart TD
     FW --> PAY{"Prize transfer<br/>succeeds?"}
     PAY -- "Yes" --> RESET["Players cleared, timer reset<br/>State returns to OPEN"]
     RESET --> OPEN
-    PAY -- "No" --> STUCK["Transaction reverts<br/>Raffle stays in CALCULATING<br/>See Known limitations"]
+    PAY -- "No" --> STUCK["Transaction reverts<br/>Raffle stays in CALCULATING<br/>(See Known limitations)"]
 ```
 
 ### 📐 Execution flow
